@@ -1,144 +1,180 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import AppShell from "./components/layout/AppShell";
+import OverviewView from "./components/dashboard/OverviewView";
+import TasksView from "./components/tasks/TasksView";
+import FocusView from "./components/focus/FocusView";
+import SettingsView from "./components/settings/SettingsView";
+import { storageService } from "./services/storage";
+import { useFocusTimer } from "./hooks/useFocusTimer";
 import "./App.css";
 
-const PRESETS = {
-  Nebula: {
-    name: "Nebula",
-    tubes: ["#5e72e4", "#8965e0", "#f5365c"],
-    lights: ["#21d4fd", "#b721ff", "#f4d03f", "#11cdef"],
-  },
-  Cyberpunk: {
-    name: "Cyberpunk",
-    tubes: ["#ff007f", "#7928ca", "#00f0ff"],
-    lights: ["#ff0055", "#00f0ff", "#7928ca", "#ffe600"],
-  },
-  Ocean: {
-    name: "Ocean",
-    tubes: ["#0070f3", "#00dfd8", "#7928ca"],
-    lights: ["#00dfd8", "#0070f3", "#50e3c2", "#11cdef"],
-  },
-  Solar: {
-    name: "Solar",
-    tubes: ["#ff4b1f", "#ff9068", "#ff0844"],
-    lights: ["#ff4e50", "#f9d423", "#ff0844", "#ffb199"],
-  },
-  Acid: {
-    name: "Acid",
-    tubes: ["#10b981", "#06b6d4", "#84cc16"],
-    lights: ["#34d399", "#a3e635", "#22d3ee", "#4ade80"],
-  },
-};
-
-/**
- * Generates an array of random hex color strings.
- * @param {number} count - The number of random colors to generate.
- * @returns {string[]} An array of color strings.
- */
-function randomColors(count) {
-  return new Array(count)
-    .fill(0)
-    .map(() => "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"));
-}
-
 export default function App() {
-  const canvasRef = useRef(null);
-  const appRef = useRef(null);
-
-  const [activePreset, setActivePreset] = useState("Nebula");
-  const [tubeColors, setTubeColors] = useState(PRESETS.Nebula.tubes);
-  const [lightColors, setLightColors] = useState(PRESETS.Nebula.lights);
-  const [isZenMode, setIsZenMode] = useState(false);
+  const [tasks, setTasks] = useState(() => storageService.loadTasks());
+  const [settings, setSettings] = useState(() => storageService.loadSettings());
+  const [activeView, setActiveView] = useState("overview"); // 'overview' | 'tasks' | 'focus' | 'settings'
+  const [focusTaskId, setFocusTaskId] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Initialize the TubesCursor 3D animation
-  useEffect(() => {
-    let isMounted = true;
+  // Focus sessions tracking
+  const [focusSessions, setFocusSessions] = useState(() =>
+    storageService.loadFocusSessions()
+  );
 
-    const initTimer = setTimeout(async () => {
-      try {
-        let module;
-        const dynamicImport = (u) => new Function("url", "return import(url)")(u);
+  // Compute total recorded focus minutes
+  const totalFocusMinutes = useMemo(() => {
+    return focusSessions.reduce((acc, sess) => acc + (sess.duration || 0), 0);
+  }, [focusSessions]);
 
-        try {
-          // Primary: load from local bundle in public folder
-          module = await dynamicImport("/tubes1.min.js");
-        } catch {
-          // Fallback: CDN
-          module = await dynamicImport(
-            "https://cdn.jsdelivr.net/npm/threejs-components@0.0.19/build/cursors/tubes1.min.js"
-          );
+  // Derived active focus task
+  const focusTask = useMemo(() => {
+    return tasks.find((t) => t.id === focusTaskId) || null;
+  }, [tasks, focusTaskId]);
+
+  // Sync tasks to local storage whenever modified
+  const updateTasks = useCallback((newTasks) => {
+    setTasks(newTasks);
+    storageService.saveTasks(newTasks);
+  }, []);
+
+  // Sync settings
+  const handleUpdateSettings = useCallback((updatedPartial) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...updatedPartial };
+      storageService.saveSettings(next);
+      return next;
+    });
+  }, []);
+
+  // Add new task
+  const handleAddTask = useCallback(
+    (newTaskData) => {
+      const nowIso = new Date().toISOString();
+      const createdTask = {
+        id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        title: newTaskData.title,
+        priority: newTaskData.priority || "medium",
+        dueAt: newTaskData.dueAt || null,
+        completed: false,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        completedAt: null,
+        isSample: false, // Explicitly user-created, not sample
+      };
+
+      updateTasks([createdTask, ...tasks]);
+    },
+    [tasks, updateTasks]
+  );
+
+  // Update existing task (PRD §7.3, FIX 2)
+  const handleUpdateTask = useCallback(
+    (taskId, updates) => {
+      const updated = tasks.map((t) => {
+        if (t.id === taskId) {
+          return {
+            ...t,
+            title: updates.title !== undefined ? updates.title : t.title,
+            priority: updates.priority !== undefined ? updates.priority : t.priority,
+            dueAt: updates.dueAt !== undefined ? updates.dueAt : t.dueAt,
+            updatedAt: new Date().toISOString(),
+          };
         }
+        return t;
+      });
+      updateTasks(updated);
+    },
+    [tasks, updateTasks]
+  );
 
-        if (!isMounted || !canvasRef.current) return;
+  // Toggle complete / reopen task (PRD §7.3, §7.4)
+  const handleToggleComplete = useCallback(
+    (taskId) => {
+      const updated = tasks.map((t) => {
+        if (t.id === taskId) {
+          const willComplete = !t.completed;
+          return {
+            ...t,
+            completed: willComplete,
+            updatedAt: new Date().toISOString(),
+            completedAt: willComplete ? new Date().toISOString() : null,
+          };
+        }
+        return t;
+      });
+      updateTasks(updated);
+    },
+    [tasks, updateTasks]
+  );
 
-        const TubesCursor = module.default;
-
-        const app = TubesCursor(canvasRef.current, {
-          tubes: {
-            colors: PRESETS.Nebula.tubes,
-            lights: {
-              intensity: 200,
-              colors: PRESETS.Nebula.lights,
-            },
-          },
-        });
-
-        appRef.current = app;
-      } catch (err) {
-        console.error("Failed to load TubesCursor module:", err);
+  // Delete task safely (PRD §15: deleting selected focus task leaves focus view valid)
+  const handleDeleteTask = useCallback(
+    (taskId) => {
+      if (focusTaskId === taskId) {
+        setFocusTaskId(null);
       }
-    }, 120);
+      const updated = tasks.filter((t) => t.id !== taskId);
+      updateTasks(updated);
+    },
+    [tasks, focusTaskId, updateTasks]
+  );
 
-    return () => {
-      isMounted = false;
-      clearTimeout(initTimer);
-      if (appRef.current && typeof appRef.current.dispose === "function") {
-        appRef.current.dispose();
-        appRef.current = null;
+  // Select task to focus on
+  const handleSelectFocus = useCallback((task) => {
+    setFocusTaskId(task ? task.id : null);
+  }, []);
+
+  // Record completed focus session (PRD §7.6, FIX 3)
+  const handleRecordFocusMinutes = useCallback(
+    (minutes) => {
+      const newSession = {
+        id: `session-${Date.now()}`,
+        taskId: focusTaskId || null,
+        duration: minutes,
+        completedAt: new Date().toISOString(),
+      };
+      setFocusSessions((prev) => {
+        const updated = [newSession, ...prev];
+        storageService.saveFocusSessions(updated);
+        return updated;
+      });
+    },
+    [focusTaskId]
+  );
+
+  // Authoritative focus timer hook that stays mounted across all view switches (FIX 3)
+  const timer = useFocusTimer({
+    initialMinutes: settings.defaultFocusMinutes || 25,
+    onRecordSession: handleRecordFocusMinutes,
+  });
+
+  // Start focus flow from widget or preset buttons
+  const handleStartFocus = useCallback(
+    (presetMinutes) => {
+      if (presetMinutes) {
+        timer.setDuration(presetMinutes);
       }
-    };
+      setActiveView("focus");
+    },
+    [timer]
+  );
+
+  // Reset to sample data
+  const handleResetSampleData = useCallback(() => {
+    const samples = storageService.resetToSampleData();
+    setTasks(samples);
+    setFocusTaskId(null);
   }, []);
 
-  // Applies a predefined color atmospheric preset
-  const applyPreset = useCallback((key) => {
-    const preset = PRESETS[key];
-    if (!preset) return;
-
-    setTubeColors(preset.tubes);
-    setLightColors(preset.lights);
-    setActivePreset(preset.name);
-
-    if (appRef.current?.tubes) {
-      appRef.current.tubes.setColors(preset.tubes);
-      appRef.current.tubes.setLightsColors(preset.lights);
-    }
+  // Clear all data
+  const handleClearAllData = useCallback(() => {
+    storageService.clearAllData();
+    setTasks([]);
+    setFocusSessions([]);
+    setFocusTaskId(null);
   }, []);
 
-  // Randomizes the tube and light colors
-  const randomizeColors = useCallback(() => {
-    const newTubes = randomColors(3);
-    const newLights = randomColors(4);
-
-    setTubeColors(newTubes);
-    setLightColors(newLights);
-    setActivePreset("Custom");
-
-    if (appRef.current?.tubes) {
-      appRef.current.tubes.setColors(newTubes);
-      appRef.current.tubes.setLightsColors(newLights);
-    }
-  }, []);
-
-  // Clicking the backdrop triggers color randomization
-  const handleContainerClick = (e) => {
-    // Prevent triggering when clicking interactive controls
-    if (e.target.closest("button") || e.target.closest("aside") || e.target.closest(".topbar")) {
-      return;
-    }
-    randomizeColors();
-  };
-
-  const toggleFullscreen = () => {
+  // Toggle fullscreen
+  const handleToggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
       setIsFullscreen(true);
@@ -146,149 +182,76 @@ export default function App() {
       document.exitFullscreen().catch(() => {});
       setIsFullscreen(false);
     }
-  };
+  }, []);
+
+  // Track fullscreen changes from ESC key
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const activeTaskCount = tasks.filter((t) => !t.completed).length;
 
   return (
-    <div
-      onClick={handleContainerClick}
-      className={`app-container ${isZenMode ? "zen-mode" : ""}`}
+    <AppShell
+      activeView={activeView}
+      onNavigate={setActiveView}
+      activeTaskCount={activeTaskCount}
+      isFullscreen={isFullscreen}
+      onToggleFullscreen={handleToggleFullscreen}
+      settings={settings}
     >
-      {/* 3D WebGL Canvas positioned behind the interface */}
-      <canvas ref={canvasRef} className="tubes-canvas" />
-
-      {/* Top Navigation Bar */}
-      <header className="topbar">
-        <a className="brand" href="/" onClick={(e) => e.stopPropagation()}>
-          <span className="brand-mark">✦</span>
-          <span className="brand-title">AURA</span>
-          <span className="brand-tag">TUBES 3D</span>
-        </a>
-
-        <div className="topbar-actions">
-          <div className="live-status">
-            <span className="status-dot" />
-            <span className="status-label">WebGL Active</span>
-          </div>
-
-          <button
-            type="button"
-            className="action-btn"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? "⛶ Exit" : "⛶ Fullscreen"}
-          </button>
-
-          <button
-            type="button"
-            className={`action-btn ${isZenMode ? "active" : ""}`}
-            title="Toggle Zen Wallpaper View"
-            onClick={() => setIsZenMode((prev) => !prev)}
-          >
-            {isZenMode ? "Show HUD" : "Zen Mode"}
-          </button>
-        </div>
-      </header>
-
-      {/* Central Hero Typography */}
-      <section className="hero">
-        <div className="hero-badge">3D KINETIC LIGHTFIELD</div>
-        <h1 className="hero-title">
-          <span className="title-lead">Tubes</span>
-          <br />
-          <span className="title-accent">Cursor</span>
-        </h1>
-        <p className="hero-subtitle">
-          A dynamic three-dimensional fluid light sculpture responding to kinetic gesture.
-        </p>
-
-        {/* Live Active Palette Swatch */}
-        <div className="palette-preview" title="Current active palette">
-          <span className="palette-label">Palette:</span>
-          <div className="swatches">
-            {tubeColors.map((color, idx) => (
-              <span
-                key={`tube-${idx}`}
-                className="swatch-dot"
-                style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
-                title={`Tube color: ${color}`}
-              />
-            ))}
-            <span className="swatch-divider" />
-            {lightColors.map((color, idx) => (
-              <span
-                key={`light-${idx}`}
-                className="swatch-dot light-swatch"
-                style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
-                title={`Light color: ${color}`}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Floating Bottom Left Interaction Hint */}
-      <div className="hint">
-        <span className="hint-icon">⚡</span>
-        <span>Click anywhere to randomize • Move to sculpt light</span>
-      </div>
-
-      {/* Floating Interactive Controls HUD */}
-      <aside className="controls" onClick={(e) => e.stopPropagation()}>
-        <div className="control-heading">
-          <span className="heading-title">Atmosphere</span>
-          <span className="preset-name">{activePreset}</span>
-        </div>
-
-        {/* Curated Preset Buttons */}
-        <div className="preset-grid">
-          {Object.keys(PRESETS).map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={`preset-btn ${activePreset === key ? "active" : ""}`}
-              onClick={() => applyPreset(key)}
-            >
-              {key}
-            </button>
-          ))}
-        </div>
-
-        {/* Randomize / Morph Trigger */}
-        <button
-          type="button"
-          className="randomize-btn"
-          onClick={randomizeColors}
-        >
-          <span className="btn-icon">🎲</span>
-          <span>Shuffle Palette</span>
-        </button>
-      </aside>
-
-      {/* Zen Mode Exit Reminder */}
-      {isZenMode && (
-        <button
-          type="button"
-          className="zen-restore-btn"
-          onClick={() => setIsZenMode(false)}
-        >
-          ✦ Exit Zen Mode
-        </button>
+      {activeView === "overview" && (
+        <OverviewView
+          tasks={tasks}
+          focusTask={focusTask}
+          focusMinutes={totalFocusMinutes}
+          onAddTask={handleAddTask}
+          onToggleComplete={handleToggleComplete}
+          onSelectFocus={(t) => {
+            handleSelectFocus(t);
+            setActiveView("focus");
+          }}
+          onDelete={handleDeleteTask}
+          onUpdateTask={handleUpdateTask}
+          onStartFocus={handleStartFocus}
+          onViewAllTasks={() => setActiveView("tasks")}
+        />
       )}
 
-      {/* Footer */}
-      <footer>
-        <span>© 2026 AURA LABS</span>
-        <span className="footer-dot">•</span>
-        <a
-          href="https://github.com/ayushpatil5408/Liquid-Wallpaper"
-          target="_blank"
-          rel="noreferrer"
-          className="footer-link"
-        >
-          GitHub Repo
-        </a>
-      </footer>
-    </div>
+      {activeView === "tasks" && (
+        <TasksView
+          tasks={tasks}
+          onToggleComplete={handleToggleComplete}
+          onSelectFocus={(t) => {
+            handleSelectFocus(t);
+            setActiveView("focus");
+          }}
+          onDelete={handleDeleteTask}
+          onAddTask={handleAddTask}
+          onUpdateTask={handleUpdateTask}
+        />
+      )}
+
+      {activeView === "focus" && (
+        <FocusView
+          focusTask={focusTask}
+          activeTasks={tasks.filter((t) => !t.completed)}
+          onSelectFocusTask={handleSelectFocus}
+          onCompleteTask={handleToggleComplete}
+          timer={timer}
+        />
+      )}
+
+      {activeView === "settings" && (
+        <SettingsView
+          settings={settings}
+          onUpdateSettings={handleUpdateSettings}
+          onResetSampleData={handleResetSampleData}
+          onClearAllData={handleClearAllData}
+        />
+      )}
+    </AppShell>
   );
 }
