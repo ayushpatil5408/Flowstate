@@ -1,6 +1,6 @@
-# ✦ AURA — 3D Kinetic Tubes Cursor & Liquid Wallpaper
+# ✦ FLOWSTATE — Productivity Dashboard & Kinetic Liquid Atmosphere
 
-> A living, interactive three-dimensional kinetic lightfield and fluid tube cursor responding in real-time to pointer and touch gestures.
+> A calm, visually distinctive productivity dashboard that turns a busy mind into a clear next step — powered by a living, interactive three-dimensional kinetic lightfield and fluid cursor.
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-liquid--wallpaper.vercel.app-000?style=for-the-badge&logo=vercel&logoColor=white)](https://liquid-wallpaper.vercel.app/)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react)](https://react.dev)
@@ -8,26 +8,26 @@
 [![Vite](https://img.shields.io/badge/Vite-8-646cff?style=for-the-badge&logo=vite)](https://vite.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-🔗 **Live Application**: [https://liquid-wallpaper.vercel.app/](https://liquid-wallpaper.vercel.app/)
+🔗 **Live Deployment**: [https://liquid-wallpaper.vercel.app/](https://liquid-wallpaper.vercel.app/)
 
 ---
 
 ## ✨ Features
 
-- **3D Kinetic Tubes Cursor Engine**: WebGL-powered dynamic fluid tubes cursor created with Three.js components that weaves glowing light ribbons trailing your cursor and touch movements.
-- **Interactive Color Morphing**: Click anywhere on the background to instantly randomize tube and light colors with smooth organic transitions.
-- **Curated Atmosphere Presets**:
-  - 🌌 **Nebula**: Deep violet, electric indigo, and neon crimson with multi-point cyan/amber luminescence.
-  - ⚡ **Cyberpunk**: High-voltage magenta, deep ultraviolet, and cyan beams.
-  - 🌊 **Ocean**: Bioluminescent turquoise, azure, and deep cerulean.
-  - 🔥 **Solar**: Blazing magma, amber flare, and golden radiant energy.
-  - 🌿 **Acid**: Toxic lime, neon emerald, and vivid radioactive cyan.
-- **Real-Time Palette Swatches**: Visual color chip HUD indicating current active tube colors and ambient light sources.
-- **Zen Wallpaper Mode**: Toggle off all HUD elements with a single click to transform your screen into an immersive, distraction-free kinetic live wallpaper.
-- **Fullscreen Support**: Dedicated fullscreen toggle for desktop displays and presentations.
-- **Touch & Mobile Optimized**: Fluid touch dragging with `touch-action: none` to prevent page bounce, responsive HUD that scales gracefully to mobile viewports.
-- **Zero-Latency Offline Fallback**: Dual-layer loading system (bundled local WebGL engine + CDN fallback) ensuring instant loading and 100% uptime.
-- **Vercel Production Ready**: Configured with `vercel.json` for single-page routing and instant deployments.
+- **Productivity Dashboard**:
+  - **Overview**: Real-time summary metrics (tasks completed, focus minutes logged, upcoming deadlines), quick-capture input, and Up Next priorities.
+  - **Task Management**: Filterable task list with priority tags (Urgent, High, Medium, Low), deadline countdowns, inline completion toggles, and edit modals.
+  - **Dedicated Focus Mode**: Integrated focus timer (custom duration, pause/resume, session tracking) to get in the zone without distraction.
+  - **Persistent Local Storage**: Offline-first architecture automatically saving tasks, sessions, and preferences locally.
+
+- **3D Kinetic Tubes Cursor & Liquid Atmosphere**:
+  - WebGL-powered dynamic fluid tubes cursor created with Three.js that weaves glowing ribbons trailing cursor and touch interactions.
+  - Interactive color morphing with smooth organic transitions.
+  - **Curated Atmosphere Presets**: Nebula 🌌, Cyberpunk ⚡, Ocean 🌊, Solar 🔥, and Acid 🌿.
+  - **Zen Mode & Fullscreen**: Toggle off HUD elements for an immersive, distraction-free kinetic ambient backdrop.
+  - Mobile touch optimized with zero bounce.
+
+- **Vercel Production Ready**: Configured with `vercel.json` for single-page routing and instant continuous deployment.
 
 ---
 
