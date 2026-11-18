@@ -77,7 +77,7 @@ This repository is pre-configured for seamless deployment on [Vercel](https://ve
 1. Push this repository to your GitHub account (`https://github.com/ayushpatil5408/Liquid-Wallpaper.git`).
 2. Log into [Vercel Dashboard](https://vercel.com/dashboard).
 3. Click **"Add New..."** → **"Project"**.
-4. Select `Liquid-Wallpaper` from your GitHub repositories (use lowercase `liquid-wallpaper` if prompted for project name).
+4. Select `Liquid-Wallpaper` from your GitHub repositories (set project name to `flowstate`).
 5. Vercel automatically detects the Vite framework and settings:
    - **Framework Preset**: Vite
    - **Build Command**: `npm run build`
